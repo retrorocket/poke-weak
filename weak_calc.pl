@@ -65,12 +65,7 @@ sub calcMagnification {
     my $type          = shift;
     my $temp          = &getType( $e, $dataset );
     for my $name (@$temp) {
-        if ( exists( $type->{$name} ) ) {
-            $type->{$name} = $type->{$name} * $magnification;
-        }
-        else {
-            $type->{$name} = $magnification;
-        }
+        $type->{$name} = exists( $type->{$name} ) ? $type->{$name} * $magnification : $magnification;
     }
     return $type;
 }
@@ -93,7 +88,7 @@ post '/weakbot/callback' => sub {
     my $source = $self->req->body;
 
     ## シグネチャチェック
-    if (!$bot->validate_signature(
+    unless ($bot->validate_signature(
             $source, $self->req->headers->header('X-Line-Signature')
         )
         )
@@ -102,7 +97,7 @@ post '/weakbot/callback' => sub {
             json => { 'status' => "failed to validate signature" } );
     }
 
-    # テキストが投稿されたか確認
+    # 投稿されたのがテキストかどうかを確認
     my $events = $bot->parse_events_from_json($source);
     my $event  = ${$events}[0];
     unless ( $event->is_message_event && $event->is_text_message ) {
@@ -122,15 +117,14 @@ post '/weakbot/callback' => sub {
     }
 
     # 投稿されたテキストをリスト化する
-    my @list = split( /[ 　]+/, $reply_text );
-
-    my $type = {};
+    my @req_types = split( /[ 　]+/, $reply_text );
 
     # 倍率計算
-    for my $e (@list) {
-        $type = &calcMagnification( $e, $DOUBLE_DATASET, 2,   $type );
-        $type = &calcMagnification( $e, $HALF_DATASET,   0.5, $type );
-        $type = &calcMagnification( $e, $ZERO_DATASET,   0,   $type );
+    my $type = {};
+    for my $req_type (@req_types) {
+        $type = &calcMagnification( $req_type, $DOUBLE_DATASET, 2,   $type );
+        $type = &calcMagnification( $req_type, $HALF_DATASET,   0.5, $type );
+        $type = &calcMagnification( $req_type, $ZERO_DATASET,   0,   $type );
     }
 
     # 投稿するメッセージの組み立て
