@@ -123,10 +123,22 @@ post '/weakbot/callback' => sub {
 
     my $flag = 0;
     my @req_types;
+    my @abilities;
     my $type_text = "";
-    for my $poke (@POKE_DATASET) { # ポケモンのタイプを検索する
+    my $abilities_text = "";
+
+    for my $poke (@POKE_DATASET) { # ポケモンのタイプ・とくせいを検索する
         if ($reply_text eq $poke->{name}) {
             @req_types = @{$poke->{types}};
+            @abilities = @{$poke->{abilities}};
+            if ($poke->{hiddenAbilities}) {
+                push(@abilities, @{$poke->{hiddenAbilities}});
+            }
+            my %tmp;
+            @abilities = grep { $tmp{$_}++ < 1; } (@abilities);
+            $type_text = "👾 ";
+            $abilities_text = "😐 ";
+
             $flag = 1;
             last;
         }
@@ -135,7 +147,7 @@ post '/weakbot/callback' => sub {
         @req_types = split( /[ 　]+/, $reply_text );
     }
 
-    # 倍率計算
+    # 倍率計算, タイプ出力
     my $type = {};
     for my $req_type (@req_types) {
         if ($flag) {
@@ -145,8 +157,13 @@ post '/weakbot/callback' => sub {
         $type = &calcMagnification( $req_type, $HALF_DATASET,   0.5, $type );
         $type = &calcMagnification( $req_type, $ZERO_DATASET,   0,   $type );
     }
+
+    # とくせい出力
+    for my $ability (@abilities) {
+        $abilities_text = $abilities_text . $ability . " ";
+    }
     if ($flag) {
-        $type_text = $type_text . "\n\n";
+        $type_text = $type_text . "\n" ."$abilities_text" . "\n";
     }
 
     # 投稿するメッセージの組み立て
