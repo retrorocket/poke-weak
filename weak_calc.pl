@@ -10,12 +10,16 @@ use Mojolicious::Lite;
 use Encode;
 use JSON;
 
-my $DOUBLE_DATASET = app->home . "/data/double.json";
-my $HALF_DATASET   = app->home . "/data/half.json";
-my $ZERO_DATASET   = app->home . "/data/zero.json";
-
 my $CHANNEL_ACCCESS_TOKEN = "";
 my $CHANNEL_SECRET = "";
+
+my $DOUBLE_DATASET = &openJson(app->home . "/data/double.json");
+my $HALF_DATASET   = &openJson(app->home . "/data/half.json");
+my $ZERO_DATASET   = &openJson(app->home . "/data/zero.json");
+
+my $POKE_GET1_7_DATASET = &openJson(app->home . "/data/pokemon_data.json");
+my $POKE_GEN8_DATASET = &openJson(app->home . "/data/gen8-jp.json");
+my @POKE_DATASET = (@$POKE_GET1_7_DATASET, @$POKE_GEN8_DATASET);
 
 # API認証情報
 my $bot = LINE::Bot::API->new(
@@ -29,6 +33,8 @@ app->config(
         workers => 1,
     },
 );
+
+my $log = app->log;
 
 ## JSONの読み込み
 sub openJson {
@@ -47,8 +53,7 @@ sub openJson {
 sub getType {
     my $text    = shift;
     my $dataset = shift;
-    my $data    = &openJson($dataset);
-    for my $type ( @{ $data->{types} } ) {
+    for my $type ( @{ $dataset->{types} } ) {
         if ( $type->{$text} ) {
             return $type->{$text};
         }
@@ -116,15 +121,32 @@ post '/weakbot/callback' => sub {
         return $self->render( json => { 'status' => "empty text." } );
     }
 
-    # 投稿されたテキストをリスト化する
-    my @req_types = split( /[ 　]+/, $reply_text );
+    my $flag = 0;
+    my @req_types;
+    my $type_text = "";
+    for my $poke (@POKE_DATASET) { # ポケモンのタイプを検索する
+        if ($reply_text eq $poke->{name}) {
+            @req_types = @{$poke->{types}};
+            $flag = 1;
+            last;
+        }
+    }
+    unless ($flag) { # 投稿されたテキストをリスト化する
+        @req_types = split( /[ 　]+/, $reply_text );
+    }
 
     # 倍率計算
     my $type = {};
     for my $req_type (@req_types) {
+        if ($flag) {
+            $type_text = $type_text . $req_type . " ";
+        }
         $type = &calcMagnification( $req_type, $DOUBLE_DATASET, 2,   $type );
         $type = &calcMagnification( $req_type, $HALF_DATASET,   0.5, $type );
         $type = &calcMagnification( $req_type, $ZERO_DATASET,   0,   $type );
+    }
+    if ($flag) {
+        $type_text = $type_text . "\n\n";
     }
 
     # 投稿するメッセージの組み立て
@@ -137,27 +159,27 @@ post '/weakbot/callback' => sub {
     for my $key ( sort { $type->{$b} <=> $type->{$a} } keys %$type ) {
         if ( $type->{$key} == 4 ) {
             $message4
-                = &buildPostMessage( "◎ x4---------\n", $message4, $key );
+                = &buildPostMessage( "⬆️⬆️ x4 ------\n", $message4, $key );
         }
         elsif ( $type->{$key} == 2 ) {
             $message2
-                = &buildPostMessage( "○ x2---------\n", $message2, $key );
+                = &buildPostMessage( "⬆️ x2 ---------\n", $message2, $key );
         }
         elsif ( $type->{$key} == 0.5 ) {
             $messageh
-                = &buildPostMessage( "▽ x0.5-------\n", $messageh, $key );
+                = &buildPostMessage( "⬇️ x0.5 -------\n", $messageh, $key );
         }
         elsif ( $type->{$key} == 0.25 ) {
             $messagen
-                = &buildPostMessage( "▼ x0.25------\n", $messagen, $key );
+                = &buildPostMessage( "⬇️⬇️ x0.25 ---\n", $messagen, $key );
         }
         elsif ( $type->{$key} == 0 ) {
             $messagez
-                = &buildPostMessage( "× x0---------\n", $messagez, $key );
+                = &buildPostMessage( "🆖 x0 ---------\n", $messagez, $key );
         }
     }
 
-    my $posttext = $message4 . $message2 . $messageh . $messagen . $messagez;
+    my $posttext = $type_text . $message4 . $message2 . $messageh . $messagen . $messagez;
     chomp($posttext);
 
     # メッセージの投稿
