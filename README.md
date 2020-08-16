@@ -6,7 +6,7 @@
   - [dayu282/pokemon\-data\.json: all Gen 8 data](https://github.com/dayu282/pokemon-data.json) -> `gen8-jp.json`
   - [kotofurumiya/pokemon\_data: 全ポケモンのJSONデータです。](https://github.com/kotofurumiya/pokemon_data) -> `pokemon_data.json`
 
-![](./screen.png)
+![](./screenshot.png)
 
 ## 相性表の情報元
 
